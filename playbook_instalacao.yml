@@ -1,0 +1,106 @@
+---
+- name: Playbook de configuração inicial do sistema
+  hosts: all
+  become: true
+
+  vars:
+    usuario_padrao: pasilva1
+    shell_padrao: /bin/bash
+
+  tasks:
+
+    - name: Definir timezone para America/Sao_Paulo
+      timezone:
+        name: America/Sao_Paulo
+
+    - name: Definir locale para pt_BR
+      lineinfile:
+        path: /etc/default/locale
+        line: LANG=pt_BR.UTF-8
+        create: yes
+
+    - name: Configurar layout do teclado ABNT2
+      copy:
+        dest: /etc/default/keyboard
+        content: |
+          XKBLAYOUT="br"
+          XKBVARIANT="abnt2"
+
+    - name: Criar usuário "{{ usuario_padrao }}"
+      user:
+        name: "{{ usuario_padrao }}"
+        password: "$y$j9T$Ze4Z6cfoP2ZP4.7s2vaFf0$zjGh0Mb2BMCq8KYxXf9u/b1NGcWKZDH8zGLpNBYFuC1"
+        shell: "{{ shell_padrao }}"
+        state: present
+        groups: sudo
+        append: yes
+
+    - name: Atualizar cache do APT
+      apt:
+        update_cache: yes
+
+    - name: Instalar pacotes essenciais
+      apt:
+        name:
+          - build-essential
+          - python3
+          - python3-pip
+          - python3-venv
+          - git
+          - curl
+          - wget
+          - vim
+          - code
+          - net-tools
+          - openssh-server
+          - openssh-client
+          - python3-dev
+          - libffi-dev
+          - libssl-dev
+          - gimp
+          - inkscape
+          - libreoffice
+        state: present
+
+    - name: Baixar Google Chrome
+      get_url:
+        url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        dest: /tmp/chrome.deb
+
+    - name: Instalar Google Chrome
+      apt:
+        deb: /tmp/chrome.deb
+      ignore_errors: yes
+
+    - name: Atualizar pip e setuptools para o usuário
+      pip:
+        name:
+          - pip
+          - setuptools
+          - wheel
+        state: latest
+        executable: pip3
+      become_user: "{{ usuario_padrao }}"
+
+    - name: Instalar ferramentas Python para o usuário
+      pip:
+        name:
+          - virtualenv
+          - ipython
+          - black
+          - flake8
+          - pylint
+          - jupyter
+          - notebook
+        executable: pip3
+      become_user: "{{ usuario_padrao }}"
+
+    - name: Habilitar e iniciar o serviço SSH
+      systemd:
+        name: ssh
+        enabled: true
+        state: started
+
+    - name: Atualizar todos os pacotes
+      apt:
+        upgrade: dist
