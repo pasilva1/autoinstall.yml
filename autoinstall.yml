@@ -1,42 +1,56 @@
-#cloud-config
-autoinstall:
-  version: 1
-  identity:
-    hostname: dell3400
-    username: pasilva1
-    password: "$y$j9T$Ze4Z6cfoP2ZP4.7s2vaFf0$zjGh0Mb2BMCq8KYxXf9u/b1NGcWKZDH8zGLpNBYFuC1"
-  locale: pt_BR
-  keyboard:
-    layout: br
-    variant: abnt2
-  timezone: America/Sao_Paulo
-  storage:
+#cloud-config                              # Início do arquivo cloud-init
+autoinstall:                               # Bloco principal da instalação automática
+  version: 1                               # Versão do autoinstall
+
+  identity:                                # Identidade do sistema
+    hostname: dell3400                    # Nome do host
+    username: pasilva1                    # Nome do usuário padrão
+    password: "$y$j9T$Ze4Z6cfoP2ZP4.7s2vaFf0$zjGh0Mb2BMCq8KYxXf9u/b1NGcWKZDH8zGLpNBYFuC1"  # Senha criptografada
+
+  locale: pt_BR                            # Idioma e região
+
+  keyboard:                                # Layout do teclado
+    layout: br                             # Layout brasileiro
+    variant: abnt2                         # Variante ABNT2 (padrão no Brasil)
+
+  timezone: America/Sao_Paulo              # Fuso horário configurado
+
+  storage:                                  # Configuração de particionamento
     layout:
-      name: direct
-  user-data:
+      name: direct                         # Usa todo o disco sem LVM ou criptografia
+
+  user-data:                                # Ações pós-instalação
     apt:
-      preserve_sources_list: false
-    packages:
-      - build-essential
-      - python3
-      - python3-pip
-      - python3-venv
-      - git
-      - curl
-      - wget
-      - vim
-      - code  # Caso VSCode esteja no repositório
-      - net-tools
-      - openssh-server
-      - openssh-client
-      - python3-dev
-      - libffi-dev
-      - libssl-dev
-    runcmd:
-      - sudo -u patrick pip3 install --upgrade pip setuptools wheel
-      - sudo -u patrick pip3 install virtualenv ipython black flake8 pylint jupyter notebook
-      - systemctl enable ssh
-  late-commands:
-    - curtin in-target -- apt-get update
-    - curtin in-target -- apt-get -y upgrade
-    - curtin in-target -- chsh -s /bin/bash patrick
+      preserve_sources_list: false         # Não preservar lista de fontes do APT
+
+    packages:                               # Lista de pacotes a instalar
+      - build-essential                     # Ferramentas de compilação
+      - python3                             # Python 3
+      - python3-pip                         # Pip para Python
+      - python3-venv                        # Ambientes virtuais em Python
+      - git                                 # Git para controle de versão
+      - curl                                # Ferramenta de requisições HTTP
+      - wget                                # Ferramenta de download
+      - vim                                 # Editor de texto
+      - code                                # VSCode (se disponível no repositório)
+      - net-tools                           # Ferramentas de rede (ex: ifconfig)
+      - openssh-server                      # Servidor SSH
+      - openssh-client                      # Cliente SSH
+      - python3-dev                         # Cabeçalhos de desenvolvimento Python
+      - libffi-dev                          # Biblioteca FFI
+      - libssl-dev                          # Biblioteca SSL
+      - gimp                                # Editor de imagens
+      - inkscape                            # Editor gráfico vetorial
+      - libreoffice                         # Suíte de escritório
+
+    runcmd:                                 # Comandos executados após a instalação
+      - wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O /tmp/chrome.deb  # Baixa o instalador do Chrome
+      - apt install -y /tmp/chrome.deb || true                 # Instala o Chrome (ignora erros)
+      - sudo -u pasilva1 pip3 install --upgrade pip setuptools wheel   # Atualiza pacotes Python
+      - sudo -u pasilva1 pip3 install virtualenv ipython black flake8 pylint jupyter notebook  # Instala ferramentas de desenvolvimento Python
+      - systemctl enable ssh                                    # Ativa o serviço SSH
+
+  late-commands:                            # Comandos executados no final da instalação
+    - curtin in-target -- apt-get update                     # Atualiza lista de pacotes
+    - curtin in-target -- apt-get -y upgrade                 # Atualiza os pacotes instalados
+    - curtin in-target -- chsh -s /bin/bash pasilva1         # Define o shell bash para o usuário
