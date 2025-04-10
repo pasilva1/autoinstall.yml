@@ -1,6 +1,6 @@
 ---
-- name: Playbook de configuração inicial do sistema
-  hosts: all
+- name: Configuração local estilo cloud-init via Ansible
+  hosts: localhost
   become: true
 
   vars:
@@ -9,37 +9,76 @@
 
   tasks:
 
-    - name: Definir timezone para America/Sao_Paulo
+    - name: Atualizar cache APT
+      apt:
+        update_cache: yes
+
+    # Timezone, locale e teclado
+    - name: Definir timezone
       timezone:
         name: America/Sao_Paulo
 
-    - name: Definir locale para pt_BR
+    - name: Gerar locale pt_BR.UTF-8
+      locale_gen:
+        name: pt_BR.UTF-8
+        state: present
+
+    - name: Definir locale padrão
       lineinfile:
-        path: /etc/default/locale
-        line: LANG=pt_BR.UTF-8
+        dest: /etc/default/locale
+        regexp: '^LANG='
+        line: 'LANG=pt_BR.UTF-8'
         create: yes
 
-    - name: Configurar layout do teclado ABNT2
+    - name: Configurar teclado ABNT2 via arquivo de configuração
       copy:
         dest: /etc/default/keyboard
         content: |
+          XKBMODEL="abnt2"
           XKBLAYOUT="br"
-          XKBVARIANT="abnt2"
+          XKBVARIANT=""
+          XKBOPTIONS=""
+      notify: Reconfigurar teclado
 
     - name: Criar usuário "{{ usuario_padrao }}"
       user:
         name: "{{ usuario_padrao }}"
-        password: "$y$j9T$Ze4Z6cfoP2ZP4.7s2vaFf0$zjGh0Mb2BMCq8KYxXf9u/b1NGcWKZDH8zGLpNBYFuC1"
         shell: "{{ shell_padrao }}"
-        state: present
+        create_home: yes
         groups: sudo
         append: yes
+        state: present
 
-    - name: Atualizar cache do APT
+    # Adiciona repositório e instala VSCode
+    - name: Adicionar chave GPG do VS Code
+      shell: |
+        curl -sSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+      args:
+        creates: /usr/share/keyrings/microsoft.gpg
+
+    - name: Adicionar repositório do VS Code
+      copy:
+        dest: /etc/apt/sources.list.d/vscode.list
+        content: "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/vscode stable main"
+
+    # Adiciona repositório e instala Brave Browser
+    - name: Adicionar chave GPG do Brave Browser
+      shell: |
+        curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave.com/static-assets/repo/brave-browser-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/brave-browser-archive-keyring.gpg
+
+    - name: Adicionar repositório do Brave Browser
+      copy:
+        dest: /etc/apt/sources.list.d/brave-browser-release.list
+        content: |
+          deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg arch=amd64] https://brave-browser-apt-release.s3.brave.com/ stable main
+
+    - name: Atualizar cache APT novamente após repositórios
       apt:
         update_cache: yes
 
-    - name: Instalar pacotes essenciais
+    - name: Instalar pacotes requisitados
       apt:
         name:
           - build-essential
@@ -60,9 +99,10 @@
           - gimp
           - inkscape
           - libreoffice
+          - brave-browser
         state: present
 
-    - name: Baixar Google Chrome
+    - name: Baixar instalador do Google Chrome
       get_url:
         url: https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
         dest: /tmp/chrome.deb
@@ -70,9 +110,9 @@
     - name: Instalar Google Chrome
       apt:
         deb: /tmp/chrome.deb
-      ignore_errors: yes
+      ignore_errors: true
 
-    - name: Atualizar pip e setuptools para o usuário
+    - name: Atualizar pip, setuptools e wheel
       pip:
         name:
           - pip
@@ -95,12 +135,21 @@
         executable: pip3
       become_user: "{{ usuario_padrao }}"
 
-    - name: Habilitar e iniciar o serviço SSH
+    - name: Ativar e iniciar serviço SSH
       systemd:
         name: ssh
-        enabled: true
+        enabled: yes
         state: started
 
-    - name: Atualizar todos os pacotes
+    - name: Atualizar sistema
       apt:
         upgrade: dist
+
+    - name: Alterar shell padrão do usuário
+      user:
+        name: "{{ usuario_padrao }}"
+        shell: "{{ shell_padrao }}"
+
+  handlers:
+    - name: Reconfigurar teclado
+      command: setupcon
